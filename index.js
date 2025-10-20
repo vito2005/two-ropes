@@ -327,12 +327,13 @@
   }
 
   function syncCanvasToCssSize() {
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = 1;
     const cssW = Math.max(1, Math.round(canvas.clientWidth));
     const cssH = Math.max(1, Math.round(canvas.clientHeight));
     const bufW = Math.round(cssW * dpr);
     const bufH = Math.round(cssH * dpr);
     if (canvas.width !== bufW || canvas.height !== bufH) {
+      console.log("syncing canvas to css size", bufW, bufH, dpr, cssW, cssH);
       canvas.width = bufW;
       canvas.height = bufH;
     }
@@ -505,9 +506,18 @@
     if (!anyActiveEnds()) {
       sim.running = false;
       playPauseBtn.textContent = "Run";
+      checkSuccess();
       return;
     }
     requestAnimationFrame(tick);
+  }
+
+  function checkSuccess() {
+    const el = document.getElementById("simTime");
+    if (!notified45 && el.textContent === "45:00" && !sim.running) {
+      notified45 = true;
+      showSuccess();
+    }
   }
 
   if (playPauseBtn) {
@@ -560,14 +570,10 @@
     if (el) {
       const text = formatTime(sim.elapsedMinutes);
       el.textContent = text;
-      if (!notified45 && text === "45:00") {
-        notified45 = true;
-        showSuccess("Congratulations! You've solved the puzzle!");
-      }
     }
   }
 
-  function showSuccess(message) {
+  function showSuccess() {
     let host = document.getElementById("toast45");
     host.style.display = "flex";
     setTimeout(() => {
