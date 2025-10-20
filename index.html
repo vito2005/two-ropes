@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Two Ropes Puzzle</title>
+    <style>
+      #cursor {
+        pointer-events: none;
+        position: absolute;
+        display: none;
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  </head>
+  <body class="bg-slate-950 text-slate-100 font-sans">
+    <div class="max-w-[1100px] mx-auto p-4 grid gap-4">
+      <header class="flex items-center justify-center gap-3">
+        <h1 class="m-0 text-3xl md:text-4xl tracking-wide font-semibold">
+          Two Ropes Puzzle
+        </h1>
+      </header>
+      <section>
+        <div class="grid gap-2 mt-2 mb-4">
+          <div class="text-slate-400 max-w-[600px] text-sm md:text-base">
+            You have a lighter and two ropes. Each rope takes 60 minutes to burn
+            from end to end. The ropes do not burn evenly, so you cannot assume
+            that X percent of the rope burns in X percent of the time.
+            <p class="mt-2">
+              Find a way to burn the ropes so you measure 45 minutes.
+            </p>
+          </div>
+        </div>
+      </section>
+      <section
+        class="rounded-xl border border-slate-800 bg-slate-900 p-3 grid gap-3"
+      >
+        <div
+          class="flex flex-col md:flex-row md:items-center justify-between gap-2"
+        >
+          <div class="flex items-center gap-3">
+            <span>Simulation time:</span>
+            <span class="tabular-nums font-semibold" id="simTime">0:00</span>
+          </div>
+          <div class="md:text-right space-x-2">
+            <button
+              id="playPause"
+              class="inline-flex items-center rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm hover:cursor-pointer"
+            >
+              Run
+            </button>
+            <button
+              id="reset"
+              class="inline-flex items-center rounded-lg border border-rose-700 bg-rose-900/20 px-3 py-2 text-sm text-rose-200 hover:cursor-pointer"
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+
+        <canvas
+          id="view"
+          height="260"
+          aria-label="Ropes visualization"
+          role="img"
+          class="w-full h-[260px] bg-slate-900 border border-slate-800 rounded-xl"
+        ></canvas>
+        <div id="cursor">🔥</div>
+        <div
+          id="toast45"
+          class="fixed inset-x-0 top-1/2 md:top-[200px] flex justify-center z-[1000] hidden"
+        >
+          <div
+            class="rounded-lg bg-gradient-to-r from-[#193e4d] to-[#1b133a] px-4 py-2 shadow-lg flex items-center gap-4"
+          >
+            <div
+              class="w-5 h-5 rounded-full bg-[#1fd36b] flex items-center justify-center"
+            >
+              <svg
+                class="w-4 h-4 text-[#1b133a]"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="4"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+            </div>
+            <div class="flex flex-col">
+              <span class="text-base text-[#1fd36b]">Congratulations! </span>
+              <span class="text-base text-gray-300"
+                >You've solved the puzzle!</span
+              >
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-4 text-sm text-slate-400 md:px-8">
+          <span class="inline-flex items-center gap-2"
+            ><span
+              class="inline-block w-7 h-4 rounded-sm bg-gradient-to-r from-slate-700 to-slate-300 border border-slate-500"
+            ></span
+            >uneven density</span
+          >
+          <span class="inline-flex items-center gap-2"
+            ><span
+              class="inline-block w-7 h-4 rounded-sm bg-slate-900 border border-slate-700"
+            ></span
+            >burnt</span
+          >
+          <span class="inline-flex items-center gap-2"
+            ><span
+              class="inline-block w-7 h-4 rounded-sm bg-amber-400 border border-amber-600"
+            ></span
+            >flame</span
+          >
+        </div>
+      </section>
+    </div>
+    <script src="index.js"></script>
+  </body>
+</html>
