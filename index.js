@@ -462,7 +462,7 @@
       state.ropes[1].left.mode = "none";
       state.ropes[1].right.mode = "none";
       resetSim();
-      playPauseBtn.textContent = "Run";
+      setRunStateVisual(false);
       closeMenu();
       render();
     });
@@ -471,6 +471,17 @@
   // --- Wire Run/Pause/Step ---
   const playPauseBtn = document.getElementById("playPause");
   const stepBtn = document.getElementById("step");
+
+  function setRunStateVisual(running) {
+    if (!playPauseBtn) return;
+    const svgs = playPauseBtn.querySelectorAll("svg");
+    const label = playPauseBtn.querySelector("span");
+    const playIcon = svgs[0];
+    const pauseIcon = svgs[1];
+    if (playIcon) playIcon.style.display = running ? "none" : "inline";
+    if (pauseIcon) pauseIcon.style.display = running ? "inline" : "none";
+    if (label) label.textContent = running ? "Pause" : "Run";
+  }
 
   function applySelections() {
     // Light any ends marked "now"
@@ -516,7 +527,7 @@
     // stop if nothing is burning
     if (!anyActiveEnds()) {
       sim.running = false;
-      playPauseBtn.textContent = "Run";
+      setRunStateVisual(false);
       checkSuccess();
       return;
     }
@@ -555,11 +566,12 @@
           return;
         }
         sim.running = true;
-        playPauseBtn.textContent = "Pause";
+        setRunStateVisual(true);
+
         requestAnimationFrame(tick);
       } else {
         sim.running = false;
-        playPauseBtn.textContent = "Run";
+        setRunStateVisual(false);
       }
     });
   }
