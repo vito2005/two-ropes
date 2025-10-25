@@ -57,10 +57,16 @@
         <div
           class="flex flex-col md:flex-row md:items-center justify-between gap-2"
         >
-          <div class="flex items-center gap-3">
-            <span>Simulation time:</span>
-            <span class="tabular-nums font-semibold" id="simTime">0:00</span>
+          <div class="flex flex-col gap-1">
+            <div class="flex items-center gap-3">
+              <span>Simulation time:</span>
+              <span class="tabular-nums font-semibold" id="simTime">0:00</span>
+            </div>
+            <div class="text-slate-400 text-xs">
+              1 minute is equal to 60 seconds.
+            </div>
           </div>
+
           <div class="md:text-right space-x-2">
             <button
               id="playPause"

@@ -74,7 +74,8 @@
     ropes: [createRopeState(0), createRopeState(1)],
     running: false,
     lastTs: null,
-    elapsedMinutes: 0,
+    elapsedSeconds: 0,
+    _accumSimSeconds: 0,
   };
 
   let notified45 = false;
@@ -84,7 +85,8 @@
     sim.ropes[1] = createRopeState(1);
     sim.running = false;
     sim.lastTs = null;
-    sim.elapsedMinutes = 0;
+    sim.elapsedSeconds = 0;
+    sim._accumSimSeconds = 0;
     updateClock();
     notified45 = false;
     const t = document.getElementById("toast45");
@@ -107,7 +109,7 @@
     );
   }
 
-  function stepRope(ropeIdx, dtMinutes) {
+  function stepRope(ropeIdx, dtSeconds) {
     const r = sim.ropes[ropeIdx];
     if (r.completed) return;
     const times = profile[ropeIdx];
@@ -117,8 +119,8 @@
     // advance left
     if (r.leftActive && r.leftIndex <= r.rightIndex) {
       const segTime = times[r.leftIndex];
-      const speed = L / segTime; // length per minute
-      r.leftConsumed += speed * dtMinutes;
+      const speedPerSec = L / (segTime * 60);
+      r.leftConsumed += speedPerSec * dtSeconds;
       while (r.leftConsumed >= L && r.leftIndex < r.rightIndex) {
         r.leftConsumed -= L;
         r.leftIndex += 1;
@@ -128,8 +130,8 @@
     // advance right
     if (r.rightActive && r.rightIndex >= r.leftIndex) {
       const segTime = times[r.rightIndex];
-      const speed = L / segTime;
-      r.rightConsumed += speed * dtMinutes;
+      const speedPerSec = L / (segTime * 60);
+      r.rightConsumed += speedPerSec * dtSeconds;
       while (r.rightConsumed >= L && r.rightIndex > r.leftIndex) {
         r.rightConsumed -= L;
         r.rightIndex -= 1;
@@ -333,7 +335,6 @@
     const bufW = Math.round(cssW * dpr);
     const bufH = Math.round(cssH * dpr);
     if (canvas.width !== bufW || canvas.height !== bufH) {
-      console.log("syncing canvas to css size", bufW, bufH, dpr, cssW, cssH);
       canvas.width = bufW;
       canvas.height = bufH;
     }
@@ -492,13 +493,23 @@
     const dtSec = (ts - sim.lastTs) / 1000;
     sim.lastTs = ts;
 
-    // Speed: minutes per real second. 1 => 60m sim completes in 60s real time
-    const SPEED_MINUTES_PER_SECOND = 1;
-    const dtMin = clamp(dtSec * SPEED_MINUTES_PER_SECOND, 0, 0.25);
-
-    stepRope(0, dtMin);
-    stepRope(1, dtMin);
-    sim.elapsedMinutes += dtMin;
+    // Speed: simulated seconds per real second
+    const SPEED_SIM_SECONDS_PER_REAL_SECOND = 60; // 1 minute per real second
+    let remaining = dtSec * SPEED_SIM_SECONDS_PER_REAL_SECOND;
+    // Integrate in small substeps to avoid dropping time on slow frames
+    const MAX_SUBSTEP = 0.25; // seconds of sim time per substep
+    while (remaining > 0) {
+      const step = remaining > MAX_SUBSTEP ? MAX_SUBSTEP : remaining;
+      stepRope(0, step);
+      stepRope(1, step);
+      sim._accumSimSeconds += step;
+      remaining -= step;
+    }
+    const whole = Math.floor(sim._accumSimSeconds + 1e-9);
+    if (whole > 0) {
+      sim.elapsedSeconds += whole;
+      sim._accumSimSeconds -= whole;
+    }
 
     render();
 
@@ -513,9 +524,23 @@
   }
 
   function checkSuccess() {
-    const el = document.getElementById("simTime");
-    if (!notified45 && el.textContent === "45:00" && !sim.running) {
+    const targetSeconds = 45 * 60;
+    const tolerance = 1;
+    if (
+      !notified45 &&
+      [
+        targetSeconds,
+        targetSeconds + tolerance,
+        targetSeconds - tolerance,
+      ].includes(sim.elapsedSeconds) &&
+      !sim.running
+    ) {
       notified45 = true;
+      const el = document.getElementById("simTime");
+      if (el) {
+        el.textContent = "45:00";
+        el.style.color = "#1fd36b";
+      }
       showSuccess();
     }
   }
@@ -544,10 +569,10 @@
       if (sim.running) return;
       applySelections();
       if (!anyActiveEnds()) return;
-      const dt = 0.02;
+      const dt = 1; // 1 simulated second per step
       stepRope(0, dt);
       stepRope(1, dt);
-      sim.elapsedMinutes += dt;
+      sim.elapsedSeconds += dt;
       render();
     });
   }
@@ -556,19 +581,19 @@
   function pad(n, w) {
     return String(n).padStart(w, "0");
   }
-  function formatTime(mins) {
-    const m = Math.floor(mins);
-    const rem = (mins - m) * 60;
-    const s = Math.floor(rem);
+  function formatTimeFromSeconds(totalSeconds) {
+    let m = Math.floor(totalSeconds / 60);
+    let s = Math.floor(totalSeconds % 60);
     if (s === 59) {
-      return `${m + 1}:00`;
+      m += 1;
+      s = 0;
     }
     return `${m}:${pad(s, 2)}`;
   }
   function updateClock() {
     const el = document.getElementById("simTime");
     if (el) {
-      const text = formatTime(sim.elapsedMinutes);
+      const text = formatTimeFromSeconds(sim.elapsedSeconds);
       el.textContent = text;
     }
   }
