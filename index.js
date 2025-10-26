@@ -420,6 +420,19 @@
 
     drawRope(ROPE_A_Y, ropeA, "Rope A");
     drawRope(ROPE_B_Y, ropeB, "Rope B");
+    // Midline to indicate rope center along length
+    (function drawMidline() {
+      const midX = canvas.clientWidth / 2;
+      ctx.save();
+      ctx.strokeStyle = "rgba(255,255,255,0.08)";
+      ctx.setLineDash([6, 6]);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(midX, 0);
+      ctx.lineTo(midX, canvas.clientHeight);
+      ctx.stroke();
+      ctx.restore();
+    })();
     updateClock();
   }
 
