@@ -7,6 +7,8 @@
   const ROPE_B_Y = 180;
   const isMobile = window.innerWidth < 768;
   const ropeX0 = isMobile ? 15 : 30;
+  const BRAID_STEP = 20; // increase to widen braid segments along the rope
+  const SHOW_DENSITY_TINT = false; // set true to show per-segment burn-speed tint
 
   // Simple helper utilities
   function clamp(v, a, b) {
@@ -30,6 +32,178 @@
     ctx.arcTo(x, y + h, x, y, r);
     ctx.arcTo(x, y, x + w, y, r);
     ctx.closePath();
+  }
+
+  // ----- VECTORS (ported) ----- //
+  function multiplyVector(v, scalar) {
+    return { x: v.x * scalar, y: v.y * scalar };
+  }
+  function getVector(a, b) {
+    return { x: b.x - a.x, y: b.y - a.y };
+  }
+  function addVectors(a, b) {
+    return { x: a.x + b.x, y: a.y + b.y };
+  }
+
+  // ----- MATH (ported) ----- //
+  function getPointOnLine(start, end, ratio) {
+    const vector = getVector(start, end);
+    const v = multiplyVector(vector, ratio);
+    return { x: start.x + v.x, y: start.y + v.y };
+  }
+  function getAngleBetweenThreePoints(a, b, c) {
+    const vectorBA = getVector(a, b);
+    const vectorBC = getVector(c, b);
+    const angle =
+      Math.atan2(vectorBC.y, vectorBC.x) - Math.atan2(vectorBA.y, vectorBA.x);
+    return angle;
+  }
+
+  // ----- CHAIKIN (ported) ----- //
+  function cut(start, end, ratio) {
+    const r1 = {
+      x: start.x * (1 - ratio) + end.x * ratio,
+      y: start.y * (1 - ratio) + end.y * ratio,
+    };
+    const r2 = {
+      x: start.x * ratio + end.x * (1 - ratio),
+      y: start.y * ratio + end.y * (1 - ratio),
+    };
+    return [r1, r2];
+  }
+  function chaikin(curve, iterations = 1, closed = false, ratio = 0.25) {
+    if (ratio > 0.5) ratio = 1 - ratio;
+    for (let i = 0; i < iterations; i++) {
+      let refined = [];
+      refined.push(curve[0]);
+      for (let j = 1; j < curve.length; j++) {
+        let points = cut(curve[j - 1], curve[j], ratio);
+        refined = refined.concat(points);
+      }
+      if (closed) {
+        refined.shift();
+        refined = refined.concat(cut(curve[curve.length - 1], curve[0], ratio));
+      } else {
+        refined.push(curve[curve.length - 1]);
+      }
+      curve = refined;
+    }
+    return curve;
+  }
+
+  // ----- ROPE GEOMETRY (adapted for straight line) ----- //
+  function getOuterPoints(v1, v2, v3, thickness, angleOffset = 0) {
+    let angle1 = getAngleBetweenThreePoints(v1, v2, v3) / 2;
+    const offset = angle1 > 0 ? -1 : 1;
+    const angle2 = getAngleBetweenThreePoints(v1, v2, {
+      x: v2.x + offset,
+      y: v2.y,
+    });
+    const angle = angle2 - angle1 + angleOffset;
+    const r = thickness / 2;
+    const point1 = {
+      x: v2.x + Math.cos(angle) * r,
+      y: v2.y - Math.sin(angle) * r,
+    };
+    const point2 = {
+      x: v2.x + Math.cos(angle + Math.PI) * r,
+      y: v2.y - Math.sin(angle + Math.PI) * r,
+    };
+    return [point1, point2];
+  }
+  function getLines(points, thickness, angleOffset = 0) {
+    const normals = [];
+    for (let i = 1; i < points.length - 1; i++) {
+      const v1 = points[i - 1];
+      const v2 = points[i];
+      const v3 = points[i + 1];
+      const line = getOuterPoints(v1, v2, v3, thickness, angleOffset);
+      normals.push(line);
+    }
+    normals.push(normals[normals.length - 1]);
+    return normals;
+  }
+  function getSegments(normals, fixGaps = false) {
+    const segments = [];
+    for (let i = 0; i < normals.length - 2; i++) {
+      const l1 = normals[i];
+      const l2 = normals[i + 1];
+      const l3 = normals[i + 2];
+      const path = [l1[0], l1[1], l2[1], l2[0]];
+      const prevSegment = segments[i - 1];
+      const A = l1[0];
+      const B = l1[1];
+      const C = l2[0];
+      const D = l2[1];
+      const E = l3[0];
+      const ratio1 = 0.3;
+      const ratio2 = 1 - ratio1;
+      const BD033 = getPointOnLine(B, D, 0.33);
+      const DC_p1 = getPointOnLine(D, C, ratio1);
+      let corner1 = getPointOnLine(BD033, DC_p1, 0.5);
+      corner1 = addVectors(
+        corner1,
+        multiplyVector(getVector(corner1, D), 0.25)
+      );
+      const DC_p2 = getPointOnLine(D, C, ratio2);
+      const CE066 = getPointOnLine(C, E, 0.66);
+      let corner2 = getPointOnLine(DC_p2, CE066, 0.5);
+      corner2 = addVectors(
+        corner2,
+        multiplyVector(getVector(corner2, C), 0.25)
+      );
+      const AC066 = getPointOnLine(A, C, 0.66);
+      const AB_p1 = getPointOnLine(A, B, ratio1);
+      const AB_p2 = getPointOnLine(A, B, ratio2);
+      const line1 = [
+        prevSegment ? prevSegment.line1[2] : B,
+        BD033,
+        corner1,
+        fixGaps ? corner1 : null,
+        fixGaps ? corner1 : null,
+        DC_p1,
+        DC_p2,
+        corner2,
+      ].filter(Boolean);
+      const line2 = [
+        corner2,
+        AC066,
+        prevSegment ? prevSegment.line1[fixGaps ? 7 : 5] : null,
+        prevSegment && fixGaps ? prevSegment.line1[7] : null,
+        prevSegment && fixGaps ? prevSegment.line1[7] : null,
+        AB_p1,
+        prevSegment ? AB_p2 : null,
+        prevSegment ? prevSegment.line1[2] : B,
+      ].filter(Boolean);
+      const roundedLine1 = chaikin(line1, 2, false, 0.25);
+      const roundedLine2 = chaikin(line2, 2, false, 0.25);
+      roundedLine1.pop();
+      roundedLine2.pop();
+      const pointsPoly = [...roundedLine1, ...roundedLine2];
+      segments.push({ line1, line2, path, points: pointsPoly });
+    }
+    return segments;
+  }
+
+  function buildStraightPathPoints(x0, x1, y, step) {
+    const points = [];
+    const length = Math.max(1, x1 - x0);
+    const count = Math.max(2, Math.floor(length / step));
+    for (let i = -1; i <= count + 1; i++) {
+      const t = Math.min(1, Math.max(0, i / count));
+      points.push({ x: x0 + t * length, y });
+    }
+    // helper endpoints
+    const vStart = getVector(points[1], points[0]);
+    const vEnd = getVector(
+      points[points.length - 2],
+      points[points.length - 1]
+    );
+    return [
+      addVectors(points[0], vStart),
+      ...points,
+      addVectors(points[points.length - 1], vEnd),
+    ];
   }
 
   // Define two simple ropes as arrays of segment "densities" (arbitrary units)
@@ -166,26 +340,61 @@
     const x0 = ropeX0;
     const height = 40;
 
-    // Background rail
-    roundRect(ctx, x0, y, width, height, 8);
-    ctx.fillStyle = "#0a0f14";
-    ctx.strokeStyle = "#1f2937";
-    ctx.lineWidth = 2;
-    ctx.fill();
-    ctx.stroke();
+    // No background rail; render only the rope itself
 
-    // Draw density segments across the rope width
-    const n = segments.length;
-    const segW = width / n;
-    let x = x0;
-    for (let i = 0; i < n; i++) {
-      const d = clamp(segments[i], 0, 2);
-      // map density to a slate-ish gradient range
-      const c = lerpColor([51, 65, 85], [148, 163, 184], clamp(d / 1.6, 0, 1));
-      ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},0.9)`;
-      ctx.fillRect(x, y, segW, height);
-      x += segW;
+    // Draw braided polygons along straight path using ported SVG algo
+    ctx.save();
+    roundRect(ctx, x0, y, width, height, 10);
+    ctx.clip();
+    const thickness = height;
+    const step = BRAID_STEP; // px between points (larger => wider segments)
+    const ang = Math.PI * 0.25; // braid angle
+    const points = buildStraightPathPoints(
+      x0,
+      x0 + width,
+      y + height / 2,
+      step
+    );
+    const normals = getLines(points, thickness, ang);
+    const polys = getSegments(normals, false);
+    const natural = ["#e4cdad", "#dcbf99", "#d6b88e", "#dcbf99"]; // alternating colors
+    for (let i = 0; i < polys.length; i++) {
+      const poly = polys[i].points;
+      ctx.beginPath();
+      ctx.moveTo(poly[0].x, poly[0].y);
+      for (let k = 1; k < poly.length; k++) ctx.lineTo(poly[k].x, poly[k].y);
+      ctx.closePath();
+      ctx.fillStyle = natural[i % natural.length];
+      ctx.fill();
+      ctx.strokeStyle = "#000";
+      ctx.lineWidth = 1;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.stroke();
     }
+    // Volume gradient
+    const edge = ctx.createLinearGradient(x0, y, x0, y + height);
+    edge.addColorStop(0, "rgba(255,255,255,0.12)");
+    edge.addColorStop(0.5, "rgba(0,0,0,0.00)");
+    edge.addColorStop(1, "rgba(0,0,0,0.18)");
+    ctx.fillStyle = edge;
+    ctx.fillRect(x0, y, width, height);
+
+    // Optional per-segment density tint (disabled by default)
+    if (SHOW_DENSITY_TINT) {
+      const n = segments.length;
+      const segW = width / n;
+      ctx.globalCompositeOperation = "multiply";
+      for (let i = 0; i < n; i++) {
+        const d = clamp(segments[i], 0, 2);
+        const shade = clamp(d / 1.6, 0, 1);
+        const c0 = lerpColor([170, 130, 85], [230, 200, 150], shade);
+        ctx.fillStyle = `rgba(${c0[0]},${c0[1]},${c0[2]},0.28)`;
+        ctx.fillRect(x0 + i * segW, y, segW + 1, height);
+      }
+      ctx.globalCompositeOperation = "source-over";
+    }
+    ctx.restore();
 
     // Label
     ctx.fillStyle = "#9aa7b2";
@@ -217,6 +426,92 @@
   render();
 
   window.addEventListener("resize", render);
+
+  // --- i18n (EN/RU) ---
+  const i18n = {
+    en: {
+      title: "Two Ropes Puzzle",
+      seoTitle: "Two Ropes Puzzle — Measure 45 Minutes",
+      intro:
+        'You have a lighter and two ropes. Each rope takes 60 minutes to burn from end to end. The ropes do not burn evenly, so you cannot assume that X percent of the rope burns in X percent of the time.\n<p class="mt-2">Find a way to burn the ropes so you measure 45 minutes.</p>',
+      timeLabel: "Simulation time:",
+      timeNote: "1 minute is equal to 60 seconds.",
+      run: "Run",
+      pause: "Pause",
+      reset: "Reset",
+      legendDensity: "uneven density",
+      toggleLabel: "RU",
+      seoDescription:
+        "You have a lighter and two ropes that burn unevenly. Use them to measure exactly 45 minutes. Interactive rope-burning puzzle.",
+    },
+    ru: {
+      title: "Задача про две верёвки",
+      seoTitle: "Задача про две верёвки — отмерьте 45 минут",
+      intro:
+        'У вас есть зажигалка и две верёвки. Каждая верёвка сгорает за 60 минут от конца до конца. Верёвки горят неравномерно, поэтому нельзя считать, что X верёвки сгорает за X времени.\n<p class="mt-2">Найдите способ сжечь верёвки так, чтобы отмерить 45 минут.</p>',
+      timeLabel: "Время симуляции:",
+      timeNote: "1 минута равна 60 секундам.",
+      run: "Старт",
+      pause: "Пауза",
+      reset: "Сброс",
+      legendDensity: "неравномерная плотность",
+      toggleLabel: "EN",
+      seoDescription:
+        "У вас есть зажигалка и две неравномерно горящие верёвки. Используйте их, чтобы точно отмерить 45 минут. Интерактивная головоломка.",
+    },
+  };
+
+  function getLang() {
+    const saved = localStorage.getItem("lang");
+    if (saved === "en" || saved === "ru") return saved;
+    const nav = (navigator.language || "en").toLowerCase();
+    return nav.startsWith("ru") ? "ru" : "en";
+  }
+  let lang = getLang();
+
+  function applyI18n() {
+    const t = i18n[lang];
+    const title = document.getElementById("title");
+    if (title) title.textContent = t.title;
+    // Update document title and meta descriptions for UX (note: for SEO/OG best done server-side)
+    document.title = t.seoTitle || t.title;
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) metaDesc.setAttribute("content", t.seoDescription || "");
+    const ogTitle = document.querySelector('meta[property="og:title"]');
+    if (ogTitle) ogTitle.setAttribute("content", t.seoTitle || t.title);
+    const ogDesc = document.querySelector('meta[property="og:description"]');
+    if (ogDesc) ogDesc.setAttribute("content", t.seoDescription || "");
+    const twTitle = document.querySelector('meta[name="twitter:title"]');
+    if (twTitle) twTitle.setAttribute("content", t.seoTitle || t.title);
+    const twDesc = document.querySelector('meta[name="twitter:description"]');
+    if (twDesc) twDesc.setAttribute("content", t.seoDescription || "");
+    const intro = document.getElementById("intro");
+    if (intro) intro.innerHTML = t.intro;
+    const timeLabel = document.getElementById("timeLabel");
+    if (timeLabel) timeLabel.textContent = t.timeLabel;
+    const timeNote = document.getElementById("timeNote");
+    if (timeNote) timeNote.textContent = t.timeNote;
+    const runLabel = document.getElementById("runLabel");
+    if (runLabel) runLabel.textContent = sim.running ? t.pause : t.run;
+    const resetLabel = document.getElementById("resetLabel");
+    if (resetLabel) resetLabel.textContent = t.reset;
+    const legendDensity = document.getElementById("legendDensity");
+    if (legendDensity && legendDensity.lastChild)
+      legendDensity.lastChild.textContent = t.legendDensity;
+    const langLabel = document.getElementById("langLabel");
+    if (langLabel) langLabel.textContent = t.toggleLabel;
+  }
+
+  const langToggle = document.getElementById("langToggle");
+  if (langToggle) {
+    langToggle.addEventListener("click", () => {
+      lang = lang === "en" ? "ru" : "en";
+      localStorage.setItem("lang", lang);
+      applyI18n();
+      setRunStateVisual(sim.running);
+    });
+  }
+  applyI18n();
 
   function getEndMode(ropeIdx, side) {
     const m = state.ropes[ropeIdx][side].mode;
@@ -480,7 +775,13 @@
     const pauseIcon = svgs[1];
     if (playIcon) playIcon.style.display = running ? "none" : "inline";
     if (pauseIcon) pauseIcon.style.display = running ? "inline" : "none";
-    if (label) label.textContent = running ? "Pause" : "Run";
+    if (label) {
+      const t =
+        typeof i18n !== "undefined" && i18n[lang]
+          ? i18n[lang]
+          : { run: "Run", pause: "Pause" };
+      label.textContent = running ? t.pause : t.run;
+    }
   }
 
   function applySelections() {
