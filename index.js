@@ -10,6 +10,95 @@
   const BRAID_STEP = 20; // increase to widen braid segments along the rope
   const SHOW_DENSITY_TINT = false; // set true to show per-segment burn-speed tint
 
+  // --- i18n (EN/RU) ---
+  const i18n = {
+    en: {
+      title: "Two Ropes Puzzle",
+      seoTitle: "Two Ropes Puzzle — Measure 45 Minutes",
+      intro:
+        'You have a lighter and two ropes. Each rope takes 60 minutes to burn from end to end. The ropes do not burn evenly, so you cannot assume that X percent of the rope burns in X percent of the time.\n<p class="mt-2">Find a way to burn the ropes so you measure 45 minutes.</p>',
+      timeLabel: "Simulation time:",
+      timeNote: "1 minute is equal to 60 seconds.",
+      run: "Run",
+      pause: "Pause",
+      reset: "Reset",
+      legendDensity: "uneven density",
+      legendBurnt: "burnt",
+      legendFlame: "flame",
+      toggleLabel: "RU",
+      ropeA: "Rope A",
+      ropeB: "Rope B",
+      seoDescription:
+        "You have a lighter and two ropes that burn unevenly. Use them to measure exactly 45 minutes. Interactive rope-burning puzzle.",
+    },
+    ru: {
+      title: "Задача про две верёвки",
+      seoTitle: "Задача про две верёвки — отмерьте 45 минут",
+      intro:
+        'У вас есть зажигалка и две верёвки. Каждая верёвка сгорает за 60 минут от конца до конца. Верёвки горят неравномерно, поэтому нельзя считать, что X верёвки сгорает за X времени.\n<p class="mt-2">Найдите способ сжечь верёвки так, чтобы отмерить 45 минут.</p>',
+      timeLabel: "Время симуляции:",
+      timeNote: "1 минута равна 60 секундам.",
+      run: "Старт",
+      pause: "Пауза",
+      reset: "Сброс",
+      legendDensity: "неравномерная плотность",
+      legendBurnt: "сгорело",
+      legendFlame: "пламя",
+      toggleLabel: "EN",
+      ropeA: "Верёвка A",
+      ropeB: "Верёвка B",
+      seoDescription:
+        "У вас есть зажигалка и две неравномерно горящие верёвки. Используйте их, чтобы точно отмерить 45 минут. Интерактивная головоломка.",
+    },
+  };
+
+  function getLang() {
+    const saved = localStorage.getItem("lang");
+    if (saved === "en" || saved === "ru") return saved;
+    const nav = (navigator.language || "en").toLowerCase();
+    return nav.startsWith("ru") ? "ru" : "en";
+  }
+  let lang = getLang();
+
+  function applyI18n() {
+    const t = i18n[lang];
+    const title = document.getElementById("title");
+    if (title) title.textContent = t.title;
+    // Update document title and meta descriptions for UX (note: for SEO/OG best done server-side)
+    document.title = t.seoTitle || t.title;
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) metaDesc.setAttribute("content", t.seoDescription || "");
+    const ogTitle = document.querySelector('meta[property="og:title"]');
+    if (ogTitle) ogTitle.setAttribute("content", t.seoTitle || t.title);
+    const ogDesc = document.querySelector('meta[property="og:description"]');
+    if (ogDesc) ogDesc.setAttribute("content", t.seoDescription || "");
+    const twTitle = document.querySelector('meta[name="twitter:title"]');
+    if (twTitle) twTitle.setAttribute("content", t.seoTitle || t.title);
+    const twDesc = document.querySelector('meta[name="twitter:description"]');
+    if (twDesc) twDesc.setAttribute("content", t.seoDescription || "");
+    const intro = document.getElementById("intro");
+    if (intro) intro.innerHTML = t.intro;
+    const timeLabel = document.getElementById("timeLabel");
+    if (timeLabel) timeLabel.textContent = t.timeLabel;
+    const timeNote = document.getElementById("timeNote");
+    if (timeNote) timeNote.textContent = t.timeNote;
+    const runLabel = document.getElementById("runLabel");
+    if (runLabel) runLabel.textContent = sim.running ? t.pause : t.run;
+    const resetLabel = document.getElementById("resetLabel");
+    if (resetLabel) resetLabel.textContent = t.reset;
+    const legendDensity = document.getElementById("legendDensity");
+    if (legendDensity && legendDensity.lastChild)
+      legendDensity.lastChild.textContent = t.legendDensity;
+    const legendBurnt = document.getElementById("legendBurnt");
+    if (legendBurnt && legendBurnt.lastChild)
+      legendBurnt.lastChild.textContent = t.legendBurnt;
+    const legendFlame = document.getElementById("legendFlame");
+    if (legendFlame && legendFlame.lastChild)
+      legendFlame.lastChild.textContent = t.legendFlame;
+    const langLabel = document.getElementById("langLabel");
+    if (langLabel) langLabel.textContent = t.toggleLabel;
+  }
+
   // Simple helper utilities
   function clamp(v, a, b) {
     return Math.max(a, Math.min(b, v));
@@ -404,7 +493,7 @@
     ctx.fillText(label, x0, y - 10);
 
     // Burn progress and flames
-    const idx = label === "Rope A" ? 0 : 1;
+    const idx = ["Rope A", "Верёвка A"].includes(label) ? 0 : 1;
     drawBurnProgress(x0, y, width, height, idx);
 
     // End markers
@@ -418,8 +507,11 @@
     // Clear using CSS pixel coords (transform set to DPR)
     ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
 
-    drawRope(ROPE_A_Y, ropeA, "Rope A");
-    drawRope(ROPE_B_Y, ropeB, "Rope B");
+    const ropeNameA = i18n[lang].ropeA;
+    const ropeNameB = i18n[lang].ropeB;
+
+    drawRope(ROPE_A_Y, ropeA, ropeNameA);
+    drawRope(ROPE_B_Y, ropeB, ropeNameB);
     // Midline to indicate rope center along length
     (function drawMidline() {
       const midX = canvas.clientWidth / 2;
@@ -440,81 +532,6 @@
 
   window.addEventListener("resize", render);
 
-  // --- i18n (EN/RU) ---
-  const i18n = {
-    en: {
-      title: "Two Ropes Puzzle",
-      seoTitle: "Two Ropes Puzzle — Measure 45 Minutes",
-      intro:
-        'You have a lighter and two ropes. Each rope takes 60 minutes to burn from end to end. The ropes do not burn evenly, so you cannot assume that X percent of the rope burns in X percent of the time.\n<p class="mt-2">Find a way to burn the ropes so you measure 45 minutes.</p>',
-      timeLabel: "Simulation time:",
-      timeNote: "1 minute is equal to 60 seconds.",
-      run: "Run",
-      pause: "Pause",
-      reset: "Reset",
-      legendDensity: "uneven density",
-      toggleLabel: "RU",
-      seoDescription:
-        "You have a lighter and two ropes that burn unevenly. Use them to measure exactly 45 minutes. Interactive rope-burning puzzle.",
-    },
-    ru: {
-      title: "Задача про две верёвки",
-      seoTitle: "Задача про две верёвки — отмерьте 45 минут",
-      intro:
-        'У вас есть зажигалка и две верёвки. Каждая верёвка сгорает за 60 минут от конца до конца. Верёвки горят неравномерно, поэтому нельзя считать, что X верёвки сгорает за X времени.\n<p class="mt-2">Найдите способ сжечь верёвки так, чтобы отмерить 45 минут.</p>',
-      timeLabel: "Время симуляции:",
-      timeNote: "1 минута равна 60 секундам.",
-      run: "Старт",
-      pause: "Пауза",
-      reset: "Сброс",
-      legendDensity: "неравномерная плотность",
-      toggleLabel: "EN",
-      seoDescription:
-        "У вас есть зажигалка и две неравномерно горящие верёвки. Используйте их, чтобы точно отмерить 45 минут. Интерактивная головоломка.",
-    },
-  };
-
-  function getLang() {
-    const saved = localStorage.getItem("lang");
-    if (saved === "en" || saved === "ru") return saved;
-    const nav = (navigator.language || "en").toLowerCase();
-    return nav.startsWith("ru") ? "ru" : "en";
-  }
-  let lang = getLang();
-
-  function applyI18n() {
-    const t = i18n[lang];
-    const title = document.getElementById("title");
-    if (title) title.textContent = t.title;
-    // Update document title and meta descriptions for UX (note: for SEO/OG best done server-side)
-    document.title = t.seoTitle || t.title;
-    const metaDesc = document.querySelector('meta[name="description"]');
-    if (metaDesc) metaDesc.setAttribute("content", t.seoDescription || "");
-    const ogTitle = document.querySelector('meta[property="og:title"]');
-    if (ogTitle) ogTitle.setAttribute("content", t.seoTitle || t.title);
-    const ogDesc = document.querySelector('meta[property="og:description"]');
-    if (ogDesc) ogDesc.setAttribute("content", t.seoDescription || "");
-    const twTitle = document.querySelector('meta[name="twitter:title"]');
-    if (twTitle) twTitle.setAttribute("content", t.seoTitle || t.title);
-    const twDesc = document.querySelector('meta[name="twitter:description"]');
-    if (twDesc) twDesc.setAttribute("content", t.seoDescription || "");
-    const intro = document.getElementById("intro");
-    if (intro) intro.innerHTML = t.intro;
-    const timeLabel = document.getElementById("timeLabel");
-    if (timeLabel) timeLabel.textContent = t.timeLabel;
-    const timeNote = document.getElementById("timeNote");
-    if (timeNote) timeNote.textContent = t.timeNote;
-    const runLabel = document.getElementById("runLabel");
-    if (runLabel) runLabel.textContent = sim.running ? t.pause : t.run;
-    const resetLabel = document.getElementById("resetLabel");
-    if (resetLabel) resetLabel.textContent = t.reset;
-    const legendDensity = document.getElementById("legendDensity");
-    if (legendDensity && legendDensity.lastChild)
-      legendDensity.lastChild.textContent = t.legendDensity;
-    const langLabel = document.getElementById("langLabel");
-    if (langLabel) langLabel.textContent = t.toggleLabel;
-  }
-
   const langToggle = document.getElementById("langToggle");
   if (langToggle) {
     langToggle.addEventListener("click", () => {
@@ -522,6 +539,8 @@
       localStorage.setItem("lang", lang);
       applyI18n();
       setRunStateVisual(sim.running);
+      // Re-render so rope labels (A/B) update immediately
+      render();
     });
   }
   applyI18n();
